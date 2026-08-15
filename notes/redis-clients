@@ -1,0 +1,5 @@
+Redis clients are software tools or programming libraries that let your app talk to a Redis server
+
+they transfer code functions into RESP protocol and manage tcp connections 
+
+eg : redis-py for python and node-redis for Node.js
