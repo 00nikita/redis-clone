@@ -4,6 +4,11 @@ import json
 with open("config.json") as f:
     config = json.load(f)
 
+def execute_command(request):
+    if request == ["PING"]:
+        return b"+PONG\r\n"
+    return b"+OK\r\n"
+
 def handle_client(client_connection, client_address, buffer):
     while True:
         request = []
@@ -28,9 +33,8 @@ def handle_client(client_connection, client_address, buffer):
             else:
                 remaining_part += client_connection.recv(1024)
         buffer = remaining_part
-        # RESP_parser(request, client_connection, client_address)
-        print(request)
-        client_connection.sendall(b"+OK\r\n")
+        response = execute_command(request)
+        client_connection.sendall(response)
 
 #creating socket
 socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
