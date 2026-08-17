@@ -5,18 +5,21 @@ with open("config.json") as f:
     config = json.load(f)
 
 def handle_client(client_connection, client_address, buffer):
-    request = []
     while True:
+        request = []
         while b"\r\n" not in buffer:
             buffer += client_connection.recv(1024)
+        if buffer == b"":
+            break
         tot_words, remaining_part = buffer.split(b"\r\n", 1)
-        count = 2*int(tot_words.decode().split("*",1)[1])
+        count = int(tot_words.decode().split("*",1)[1])
         flag = 0
         while count > 0:
             if b"\r\n" in remaining_part:
                 if flag == 0:
-                    flag = 1 
-                    continue 
+                    flag = 1
+                    remaining_part = remaining_part.split(b"\r\n", 1)[1]
+                    continue
                 request_line = remaining_part.split(b"\r\n", 1)[0].decode()
                 request.append(request_line)
                 remaining_part = remaining_part.split(b"\r\n", 1)[1]
@@ -27,6 +30,7 @@ def handle_client(client_connection, client_address, buffer):
         buffer = remaining_part
         # RESP_parser(request, client_connection, client_address)
         print(request)
+        client_connection.sendall(b"+OK\r\n")
 
 #creating socket
 socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
