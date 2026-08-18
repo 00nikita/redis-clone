@@ -1,5 +1,8 @@
 import socket
 import json 
+from commands import execute_command
+from parser import handle_client
+from database import database
 
 database = {}
 
@@ -74,6 +77,6 @@ socket.bind((config['host'], config['port']))
 
 socket.listen()
 
-client_connection, client_address = socket.accept()
-
-handle_client(client_connection, client_address, b"")
+while True:
+    client_connection, client_address = socket.accept()
+    handle_client(client_connection, client_address, b"")

@@ -131,7 +131,7 @@ Rule to remember:
 
 + -> short status messages
 $ -> actual values/data
-: -> numbers
+: -> numbers : -1,0,1
 - -> errors
 * -> list of values
 ```
