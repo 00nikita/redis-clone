@@ -1,0 +1,76 @@
+Lazy Expiration vs Active Expiration
+
+Lazy Expiration
+
+- Triggered when a client accesses a key.
+- Redis checks whether the key has expired only during commands like GET, EXISTS, etc.
+- If expired:
+  - Delete the key.
+  - Return nil (or key not found).
+- If the key is never accessed again, it can remain in memory.
+
+Example:
+
+SET token abc
+EXPIRE token 10
+
+(15 seconds later)
+
+GET token
+
+↓
+
+Redis notices it expired
+
+↓
+
+Deletes it
+
+↓
+
+Returns nil
+
+------------------------------------------------------------
+
+Active Expiration
+
+- Triggered automatically by Redis in the background.
+- Redis periodically wakes up and checks a small random sample of keys that have expiry times.
+- If a key has expired:
+  - Delete it immediately.
+- Works even if no client accesses the key.
+
+Example:
+
+SET otp 123456
+EXPIRE otp 300
+
+(No client ever accesses the key)
+
+↓
+
+Redis background task runs
+
+↓
+
+Finds otp has expired
+
+↓
+
+Deletes it automatically
+
+------------------------------------------------------------
+
+Lazy Expiration
+- Runs on client access.
+- Deletes keys only when they are used.
+- Saves CPU.
+- Expired keys may stay in memory if never accessed.
+
+Active Expiration
+- Runs periodically in the background.
+- Deletes expired keys even if nobody accesses them.
+- Frees memory automatically.
+- Uses a small amount of CPU for cleanup.
+
+Redis uses both Lazy Expiration and Active Expiration together to balance CPU usage and memory usage.
