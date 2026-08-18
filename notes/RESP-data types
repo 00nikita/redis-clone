@@ -1,0 +1,137 @@
+```text
+RESP has different data types. The first character tells the client how to interpret the response.
+
++  -> Simple String
+
+Used for small success messages.
+
+Examples:
++OK\r\n
++PONG\r\n
+
+The client simply reads until it finds \r\n.
+
+No length is required because these responses are short and cannot contain embedded newlines.
+
+------------------------------------------------------------
+
+$  -> Bulk String
+
+Used for actual data stored in Redis.
+
+Format:
+
+$<length>\r\n
+<data>\r\n
+
+Example:
+
+$8\r\n
+NIKHITHA\r\n
+
+Length tells the client exactly how many bytes belong to the value.
+
+Why?
+
+Imagine the value is:
+
+Hello
+World
+
+The value itself contains \r\n.
+
+If Redis simply read until the first \r\n, it would stop after "Hello" and lose the rest.
+
+Instead Redis says:
+
+Length = 12 bytes
+
+Then the client reads exactly 12 bytes, even if they contain spaces, newlines, binary data or anything else.
+
+Bulk Strings can safely store:
+- normal text
+- spaces
+- multiple lines
+- binary data
+- empty strings
+
+------------------------------------------------------------
+
+:  -> Integer
+
+Used whenever Redis wants to return a number.
+
+Examples:
+
+:1\r\n
+:0\r\n
+:25\r\n
+
+Client reads digits until \r\n and converts them into an integer.
+
+Commands like DEL and EXISTS naturally return numbers.
+
+Example:
+
+SET name Nikita
+
+EXISTS name
+
+Redis returns:
+
+:1\r\n
+
+meaning
+
+1 key exists.
+
+DEL name
+
+Redis returns
+
+:1\r\n
+
+meaning
+
+1 key deleted.
+
+DEL name again
+
+Redis returns
+
+:0\r\n
+
+meaning
+
+0 keys deleted because the key was already missing.
+
+------------------------------------------------------------
+
+-  -> Error
+
+Used whenever something goes wrong.
+
+Example:
+
+-ERR unknown command\r\n
+
+Client reads until \r\n and treats it as an error instead of a normal response.
+
+------------------------------------------------------------
+
+RESP response types
+
++  Simple String
+$  Bulk String
+:  Integer
+-  Error
+*  Array (used mainly for requests and some responses)
+
+Rule to remember:
+
++ -> short status messages
+$ -> actual values/data
+: -> numbers
+- -> errors
+* -> list of values
+```
