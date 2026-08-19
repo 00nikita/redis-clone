@@ -1,0 +1,197 @@
+What is TTL?
+
+TTL stands for Time To Live.
+
+It tells us:
+
+"How many seconds are left before this key expires?"
+
+TTL does not set the expiry.
+
+It only reports the remaining time.
+
+------------------------------------------------------------
+
+Difference between EXPIRE and TTL
+
+EXPIRE
+
+Purpose:
+Sets an expiry time for a key.
+
+Example:
+
+EXPIRE token 60
+
+Meaning:
+
+Delete this key after 60 seconds.
+
+Internally:
+
+Current time = 1000
+
+↓
+
+EXPIRE token 60
+
+↓
+
+expiry["token"] = 1060
+
+EXPIRE modifies the expiry dictionary.
+
+------------------------------------------------------------
+
+TTL
+
+Purpose:
+Returns the remaining lifetime of a key.
+
+Example:
+
+Current time = 1020
+
+expiry["token"] = 1060
+
+TTL token
+
+↓
+
+1060 - 1020
+
+↓
+
+40
+
+Redis returns:
+
+(integer) 40
+
+TTL never changes the expiry time.
+
+It only calculates:
+
+remaining_time = expiry_time - current_time
+
+------------------------------------------------------------
+
+Real-world example
+
+User logs in.
+
+SET session:abc xyz
+
+EXPIRE session:abc 86400
+
+(24 hours)
+
+Later...
+
+The frontend wants to know:
+
+"How long until the user is automatically logged out?"
+
+Instead of remembering the expiry itself, it asks Redis:
+
+TTL session:abc
+
+↓
+
+3521
+
+Meaning:
+
+This session will expire in 3521 seconds.
+
+------------------------------------------------------------
+
+Another example
+
+OTP
+
+EXPIRE otp 300
+
+(5 minutes)
+
+Two minutes later:
+
+TTL otp
+
+↓
+
+180
+
+The application can now show:
+
+"OTP expires in 3 minutes."
+
+------------------------------------------------------------
+
+Redis return values
+
+TTL key
+
+Case 1
+
+Key exists and has expiry
+
+↓
+
+Returns remaining seconds.
+
+Example:
+
+:45
+
+Meaning:
+
+45 seconds left.
+
+----------------------
+
+Case 2
+
+Key exists but has no expiry
+
+↓
+
+Returns
+
+:-1
+
+Meaning:
+
+The key exists forever.
+
+----------------------
+
+Case 3
+
+Key doesn't exist
+
+↓
+
+Returns
+
+:-2
+
+Meaning:
+
+Nothing to check because the key is missing.
+
+------------------------------------------------------------
+
+Summary
+
+EXPIRE
+
+- Sets when a key should expire.
+- Writes into the expiry dictionary.
+
+TTL
+
+- Reads from the expiry dictionary.
+- Calculates remaining time.
+- Does not modify anything.
+- Returns the number of seconds left.

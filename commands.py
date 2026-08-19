@@ -35,6 +35,10 @@ def execute_command(request):
     elif request[0] == "EXISTS":
         key = request[1]
         if key in database:
+            if key in expiry and time.time() > expiry[key]:
+                del database[key]
+                del expiry[key]
+                return b"$-1\r\n"
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "EXPIRE":
@@ -43,5 +47,17 @@ def execute_command(request):
             expiry[key] = time.time() + int(config["expiry_time_in_seconds"])
             return b":1\r\n"
         return b":0\r\n"
+    elif request[0] == "TTL":
+        key = request[1]
+        if key in database:
+            if key in expiry:
+                ttl = int(expiry[key]-time.time())
+                if ttl < 0:
+                    del database[key]
+                    del expiry[key]
+                    return b":-2\r\n"
+                return f":{ttl}\r\n".encode()
+            return b":-1\r\n"
+        return b":-2\r\n"
     else:
         return b"-ERROR: Unknown command\r\n"
