@@ -6,6 +6,9 @@ with open("config.json") as f:
     config = json.load(f)
 
 def execute_command(request):
+    if request[0] in ["SET", "DEL", "EXPIRE"]:
+        with open("appendonly.aof", "a") as f:
+            f.write(" ".join(request) + "\n")
     if request == ["PING"]:
         return b"+PONG\r\n"
     elif request[0] == "SET":
