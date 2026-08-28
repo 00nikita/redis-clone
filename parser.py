@@ -24,5 +24,5 @@ def handle_client(client_connection, client_address, buffer):
             else:
                 remaining_part += client_connection.recv(1024)
         buffer = remaining_part
-        response = execute_command(request)
+        response = execute_command(request, persist=True)
         client_connection.sendall(response)
