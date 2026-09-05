@@ -6,15 +6,15 @@ with open("config.json") as f:
     config = json.load(f)
 
 def execute_command(request, persist=False):
-    if request[0] in ["SET", "DEL", "EXPIRE"] and persist:
-        with open("appendonly.aof", "a") as f:
-            f.write(" ".join(request) + "\n")
     if request == ["PING"]:
         return b"+PONG\r\n"
     elif request[0] == "SET":
         key = request[1]
         value = request[2]
         database[key] = value
+        if persist:
+          with open("appendonly.aof", "a") as f:
+            f.write(" ".join(request) + "\n")
         return b"+OK\r\n"
     elif request[0] == "GET":
         key = request[1]
@@ -33,6 +33,9 @@ def execute_command(request, persist=False):
             del database[key]
             if key in expiry:
                 del expiry[key]
+            if persist:
+              with open("appendonly.aof", "a") as f:
+                f.write(" ".join(request) + "\n")
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "EXISTS":
@@ -47,7 +50,13 @@ def execute_command(request, persist=False):
     elif request[0] == "EXPIRE":
         key = request[1]
         if key in database:
-            expiry[key] = time.time() + int(config["expiry_time_in_seconds"])
+            if persist:
+                expiry[key] = time.time() + int(request[2])
+                request[2] = expiry[key]
+                with open("appendonly.aof", "a") as f:
+                    f.write(" ".join(request) + "\n")
+            else:
+                expiry[key] = float(request[2])
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "TTL":
