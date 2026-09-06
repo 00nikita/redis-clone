@@ -240,5 +240,69 @@ def execute_command(request, persist=False):
             return f":{len(database[key])}\r\n".encode()
         else:
             return b"*0\r\n"
+    elif request[0] == "SADD":
+        key = request[1]
+        members = request[2:]
+        if key not in database:
+            database[key] = set()
+        database[key].update(members)
+        if persist:
+            with open("appendonly.aof", "a") as f:
+                f.write(" ".join(request) + "\n")
+            return b":1\r\n"
+        return b":0\r\n"
+    elif request[0] == "SMEMBERS":
+        key = request[1]
+        if key in database:
+            members = database[key]
+            response = f"*{len(members)}\r\n"
+            for member in members:
+                response += f"${len(member)}\r\n{member}\r\n"
+            return response.encode()
+        else:
+            return b"*0\r\n"
+    elif request[0] == "SREM":
+        key = request[1]
+        members = request[2:]
+        if key in database:
+            removed = 0
+            for member in members:
+                if member in database[key]:
+                    database[key].remove(member)
+                    removed += 1
+            if persist:
+                with open("appendonly.aof", "a") as f:
+                    f.write(" ".join(request) + "\n")
+            return f":{removed}\r\n".encode()
+        return b":0\r\n"
+    elif request[0] == "SISMEMBER":
+        key = request[1]
+        member = request[2]
+        if key in database:
+            if member in database[key]:
+                return b":1\r\n"
+            else:
+                return b":0\r\n"
+        else:
+            return b"*0\r\n"
+    elif request[0] == "SCARD":
+        key = request[1]
+        if key in database:
+            return f":{len(database[key])}\r\n".encode()
+        else:
+            return b"*0\r\n"
+    elif request[0] == "SPOP":
+        key = request[1]
+        if key in database:
+            if database[key]:
+                member = database[key].pop()
+                if persist:
+                    with open("appendonly.aof", "a") as f:
+                        f.write(f"SREM {key} {member}\n")
+                return f"${len(member)}\r\n{member}\r\n".encode()
+            else:
+                return b"$-1\r\n"
+        else:
+            return b"*0\r\n"
     else:
         return b"-ERROR: Unknown command\r\n"
