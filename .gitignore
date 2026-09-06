@@ -1,1 +1,4 @@
 appendonly.aof
+appendonly.aof.tmp
+__pycache__/
+*.pyc
