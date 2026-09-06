@@ -1,11 +1,11 @@
 import socket
 import json 
+import os
 from commands import execute_command
 from parser import handle_client
 from database import database
-from aof_parser import load_aof
+from aof_parser import load_aof, rewrite_aof
 
-database = {}
 
 with open("config.json") as f:
     config = json.load(f)
