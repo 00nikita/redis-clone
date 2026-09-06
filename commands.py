@@ -178,5 +178,67 @@ def execute_command(request, persist=False):
                 return b"-ERROR: Key is not a list\r\n"
         else:
             return b"*0\r\n"
+    elif request[0] == "HSET":
+        key = request[1]
+        field = request[2]
+        value = request[3]
+        if key not in database:
+            database[key] = {}
+        database[key][field] = value
+        if persist:
+            with open("appendonly.aof", "a") as f:
+                f.write("HSET {} {} {}\n".format(key, field, value))
+        return b"+OK\r\n"
+    elif request[0] == "HGET":
+        key = request[1]
+        field = request[2]
+        if key in database:
+            if field in database[key]:
+                value = database[key][field]
+                return f"${len(value)}\r\n{value}\r\n".encode()
+            else:
+                return b"$-1\r\n"
+        else:
+            return b"*0\r\n"
+    elif request[0] == "HGETALL":
+        key = request[1]
+        if key in database:
+            response = f"*{len(database[key])*2}\r\n"
+            for field, value in database[key].items():
+                response += f"${len(field)}\r\n{field}\r\n"
+                response += f"${len(value)}\r\n{value}\r\n"
+            return response.encode()
+        else:
+            return b"*0\r\n"
+    elif request[0] == "HDEL":
+        key = request[1]
+        field = request[2]
+        if key in database:
+            if field in database[key]:
+                del database[key][field]
+                if persist:
+                    with open("appendonly.aof", "a") as f:
+                        f.write("HDEL {} {}\n".format(key, field))
+                return b":1\r\n"
+            else:
+                return b":0\r\n"
+        else:
+            return b"*0\r\n"
+    elif request[0] == "HEXISTS":
+        key = request[1]
+        field = request[2]
+        if key in database:
+            if field in database[key]:
+                return b":1\r\n"
+            else:
+                return b":0\r\n"
+        else:
+            return b"*0\r\n"
+    elif request[0] == "HLEN":
+        key = request[1]
+        if key in database:
+            return f":{len(database[key])}\r\n".encode()
+        else:
+            return b"*0\r\n"
     else:
         return b"-ERROR: Unknown command\r\n"
