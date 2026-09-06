@@ -16,3 +16,10 @@ def rewrite_aof():
         for key, value in database.items():
             f.write(f"SET {key} {value}\n")
     os.replace("appendonly.aof.tmp", "appendonly.aof")
+
+def should_rewrite_aof():
+    try:
+        size = os.path.getsize("appendonly.aof")
+    except FileNotFoundError:
+        return False 
+    return size > 1024

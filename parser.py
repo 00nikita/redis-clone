@@ -3,8 +3,11 @@ from commands import execute_command
 def handle_client(client_connection, client_address, buffer):
     while True:
         request = []
-        while b"\r\n" not in buffer:
-            buffer += client_connection.recv(1024)
+        try:
+            while b"\r\n" not in buffer:
+                buffer += client_connection.recv(1024)
+        except ConnectionResetError:
+            break
         if buffer == b"":
             break
         tot_words, remaining_part = buffer.split(b"\r\n", 1)

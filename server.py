@@ -4,7 +4,7 @@ import os
 from commands import execute_command
 from parser import handle_client
 from database import database
-from aof_parser import load_aof, rewrite_aof
+from aof_parser import load_aof, rewrite_aof, should_rewrite_aof
 
 
 with open("config.json") as f:
@@ -25,3 +25,5 @@ load_aof()
 while True:
     client_connection, client_address = socket.accept()
     handle_client(client_connection, client_address, b"")
+    if should_rewrite_aof():
+        rewrite_aof()
