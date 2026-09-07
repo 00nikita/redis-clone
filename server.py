@@ -14,6 +14,8 @@ with open("config.json") as f:
 #creating socket
 socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+socket.setblocking(False)
+
 #bind socket
 socket.bind((config['host'], config['port']))
 
@@ -32,6 +34,7 @@ while True:
     for sock in readable:
         if sock is socket:
             client_connection, client_address = socket.accept()
+            client_connection.setblocking(False)
             sockets.append(client_connection)
             buffers[client_connection] = b""
         else:
@@ -42,7 +45,10 @@ while True:
                 sock.close()
             else:
                 buffers[sock] += data
-                buffers[sock] = handle_client(sock, buffers[sock])
-                print(buffers[sock])
+                while buffers[sock]:
+                    new_buffer = handle_client(sock, buffers[sock])
+                    if new_buffer == buffers[sock]:
+                        break
+                    buffers[sock] = new_buffer
     if should_rewrite_aof():
         rewrite_aof()
