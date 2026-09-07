@@ -1,11 +1,12 @@
 from database import database, expiry
 import time
 import json 
+from pubsub import subscriptions
 
 with open("config.json") as f:
     config = json.load(f)
 
-def execute_command(request, persist=False):
+def execute_command(request, persist=False, client_connection=None):
     if request == ["PING"]:
         return b"+PONG\r\n"
     elif request[0] == "SET":
@@ -304,5 +305,41 @@ def execute_command(request, persist=False):
                 return b"$-1\r\n"
         else:
             return b"*0\r\n"
+    elif request[0] == "SUBSCRIBE":
+        channel = request[1]
+        if channel not in subscriptions:
+            subscriptions[channel] = set()
+        subscriptions[channel].add(client_connection)
+        response = "*3\r\n"
+        response += "$9\r\nsubscribe\r\n"
+        response += f"${len(channel)}\r\n{channel}\r\n"
+        response += ":1\r\n"
+        return response.encode()
+    elif request[0] == "PUBLISH":
+        channel = request[1]
+        message = request[2]
+        if channel in subscriptions:
+            subscribers = subscriptions[channel]
+            for subscriber in subscribers:
+                response = f"*3\r\n"
+                response += f"${len('message')}\r\nmessage\r\n"
+                response += f"${len(channel)}\r\n{channel}\r\n"
+                response += f"${len(message)}\r\n{message}\r\n"
+                subscriber.sendall(response.encode())
+            return f":{len(subscribers)}\r\n".encode()
+        else:
+            return b":0\r\n"
+    elif request[0] == "UNSUBSCRIBE":
+        channel = request[1]
+        if channel in subscriptions:
+            subscribers = subscriptions[channel]
+            subscribers.discard(client_connection)
+            if not subscribers:
+                del subscriptions[channel]
+        response = "*3\r\n"
+        response += "$11\r\nunsubscribe\r\n"
+        response += f"${len(channel)}\r\n{channel}\r\n"
+        response += ":0\r\n"
+        return response.encode()
     else:
         return b"-ERROR: Unknown command\r\n"

@@ -6,6 +6,7 @@ from parser import handle_client
 from database import database
 from aof_parser import load_aof, rewrite_aof, should_rewrite_aof
 import select
+from pubsub import subscriptions
 
 
 with open("config.json") as f:
@@ -42,6 +43,8 @@ while True:
             if data == b"":
                 sockets.remove(sock)
                 del buffers[sock]
+                for channel in subscriptions:
+                    subscriptions[channel].discard(sock)
                 sock.close()
             else:
                 buffers[sock] += data
