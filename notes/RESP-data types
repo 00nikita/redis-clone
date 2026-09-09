@@ -1,4 +1,7 @@
 ```text
+
+
+
 RESP has different data types. The first character tells the client how to interpret the response.
 
 +  -> Simple String
