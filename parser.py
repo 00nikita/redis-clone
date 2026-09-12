@@ -25,6 +25,6 @@ def handle_client(client_connection, buffer):
     if not complete:
         return buffer
     buffer = remaining_part
-    response = execute_command(request, persist=True, client_connection=client_connection)
+    response = execute_command(request, persist=True, client_connection=client_connection, executing=False)
     client_connection.sendall(response)
     return buffer

@@ -2,11 +2,15 @@ from database import database, expiry
 import time
 import json 
 from pubsub import subscriptions
+from transactions import ( start_transaction, queue_command, get_queued_commands, clear_transaction, is_in_transaction )
 
 with open("config.json") as f:
     config = json.load(f)
 
-def execute_command(request, persist=False, client_connection=None):
+def execute_command(request, persist=False, client_connection=None, executing=False):
+    if is_in_transaction(client_connection) and not executing and request[0] not in ["EXEC", "DISCARD", "MULTI"]:
+        queue_command(client_connection, request)
+        return b"+QUEUED\r\n"
     if request == ["PING"]:
         return b"+PONG\r\n"
     elif request[0] == "SET":
@@ -341,5 +345,24 @@ def execute_command(request, persist=False, client_connection=None):
         response += f"${len(channel)}\r\n{channel}\r\n"
         response += ":0\r\n"
         return response.encode()
+    elif request[0] == "MULTI":
+        start_transaction(client_connection)
+        return b"+OK\r\n"
+
+    elif request[0] == "EXEC":
+        if is_in_transaction(client_connection):
+            commands = get_queued_commands(client_connection)
+            clear_transaction(client_connection)
+            for cmd in commands:
+                execute_command(cmd, client_connection=client_connection, executing=True)
+            return b"+OK\r\n"
+        return b"-ERROR: NO TRANSACTION\r\n"
+
+    elif request[0] == "DISCARD":
+        if is_in_transaction(client_connection):
+            clear_transaction(client_connection)
+            return b"+OK\r\n"
+        return b"-ERROR: NO TRANSACTION\r\n"
+
     else:
         return b"-ERROR: Unknown command\r\n"
