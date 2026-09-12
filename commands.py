@@ -3,11 +3,47 @@ import time
 import json 
 from pubsub import subscriptions
 from transactions import ( start_transaction, queue_command, get_queued_commands, clear_transaction, is_in_transaction )
+from replication import replicas
 
 with open("config.json") as f:
     config = json.load(f)
 
-def execute_command(request, persist=False, client_connection=None, executing=False):
+WRITE_COMMANDS = {
+    "SET",
+    "DEL",
+    "INCR",
+    "DECR",
+    "EXPIRE",
+    "LPUSH",
+    "RPUSH",
+    "LPOP",
+    "RPOP",
+    "LSET",
+    "HSET",
+    "HDEL",
+    "SADD",
+    "SREM",
+    "ZADD",
+    "ZREM",
+}
+
+def replicate_command(request):
+    for replica in list(replicas):
+        try:
+            resp = f"*{len(request)}\r\n"
+            for word in request:
+                resp += f"${len(word)}\r\n{word}\r\n"
+            replica.sendall(resp.encode())
+        except (BrokenPipeError, ConnectionResetError):
+            replicas.remove(replica)
+            replica.close()
+
+
+def execute_command(request, persist=False, client_connection=None, executing=False, from_replica=False):
+    should_replicate = (
+    not from_replica
+    and request[0] in WRITE_COMMANDS
+    )
     if is_in_transaction(client_connection) and not executing and request[0] not in ["EXEC", "DISCARD", "MULTI"]:
         queue_command(client_connection, request)
         return b"+QUEUED\r\n"
@@ -20,6 +56,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if persist:
           with open("appendonly.aof", "a") as f:
             f.write(" ".join(request) + "\n")
+        if should_replicate:
+           replicate_command(request)
         return b"+OK\r\n"
     elif request[0] == "GET":
         key = request[1]
@@ -29,6 +67,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                 del expiry[key]
                 return b"$-1\r\n"
             value = database[key]
+            if should_replicate:
+               replicate_command(request)
             return f"${len(value)}\r\n{value}\r\n".encode()
         else:
             return b"$-1\r\n"
@@ -41,6 +81,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
             if persist:
               with open("appendonly.aof", "a") as f:
                 f.write(" ".join(request) + "\n")
+            if should_replicate:
+               replicate_command(request)
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "EXISTS":
@@ -50,6 +92,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                 del database[key]
                 del expiry[key]
                 return b"$-1\r\n"
+            if should_replicate:
+               replicate_command(request)
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "EXPIRE":
@@ -62,6 +106,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                     f.write(" ".join(request) + "\n")
             else:
                 expiry[key] = float(request[2])
+            if should_replicate:
+               replicate_command(request)
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "TTL":
@@ -74,6 +120,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                     del expiry[key]
                     return b":-2\r\n"
                 return f":{ttl}\r\n".encode()
+            if should_replicate:
+               replicate_command(request)
             return b":-1\r\n"
         return b":-2\r\n"
     elif request[0] == "LPUSH":
@@ -85,6 +133,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if persist:
             with open("appendonly.aof", "a") as f:
                 f.write(" ".join(request) + "\n")
+        if should_replicate:
+           replicate_command(request)
         return b":1\r\n"
     elif request[0] == "RPUSH":
         key = request[1]
@@ -95,6 +145,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if persist:
             with open("appendonly.aof", "a") as f:
                 f.write(" ".join(request) + "\n")
+        if should_replicate:
+           replicate_command(request)
         return b":1\r\n"
     elif request[0] == "LRANGE":
         key = request[1]
@@ -109,6 +161,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                 response = f"*{len(values)}\r\n"
                 for value in values:
                     response += f"${len(value)}\r\n{value}\r\n"
+                if should_replicate:
+                   replicate_command(request)
                 return response.encode()
             else:
                 return b"-ERROR: Key is not a list\r\n"
@@ -118,6 +172,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         key = request[1]
         if key in database:
             if isinstance(database[key], list):
+                if should_replicate:
+                   replicate_command(request)
                 return f":{len(database[key])}\r\n".encode()
             else:
                 return b"-ERROR: Key is not a list\r\n"
@@ -128,6 +184,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if key in database:
             if isinstance(database[key], list):
                 value = database[key][int(request[2])]
+                if should_replicate:
+                   replicate_command(request)
                 return f"${len(value)}\r\n{value}\r\n".encode()
             else:
                 return b"-ERROR: Key is not a list\r\n"
@@ -144,6 +202,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                     if persist:
                         with open("appendonly.aof", "a") as f:
                             f.write(" ".join(request) + "\n")
+                    if should_replicate:
+                       replicate_command(request)
                     return b"+OK\r\n"
                 else:
                     return b"-ERROR: Index out of range\r\n"
@@ -162,6 +222,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                     if persist:
                         with open("appendonly.aof", "a") as f:
                             f.write("LPOP {} {}\n".format(key, value))
+                    if should_replicate:
+                       replicate_command(request)
                     return f"${len(value)}\r\n{value}\r\n".encode()
                 return b"$-1\r\n"
             else:
@@ -177,6 +239,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                     if persist:
                         with open("appendonly.aof", "a") as f:
                             f.write("RPOP {} {}\n".format(key, value))
+                    if should_replicate:
+                       replicate_command(request)
                     return f"${len(value)}\r\n{value}\r\n".encode()
                 return b"$-1\r\n"
             else:
@@ -193,6 +257,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if persist:
             with open("appendonly.aof", "a") as f:
                 f.write("HSET {} {} {}\n".format(key, field, value))
+        if should_replicate:
+           replicate_command(request)
         return b"+OK\r\n"
     elif request[0] == "HGET":
         key = request[1]
@@ -200,6 +266,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if key in database:
             if field in database[key]:
                 value = database[key][field]
+                if should_replicate:
+                   replicate_command(request)
                 return f"${len(value)}\r\n{value}\r\n".encode()
             else:
                 return b"$-1\r\n"
@@ -212,6 +280,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
             for field, value in database[key].items():
                 response += f"${len(field)}\r\n{field}\r\n"
                 response += f"${len(value)}\r\n{value}\r\n"
+            if should_replicate:
+               replicate_command(request)
             return response.encode()
         else:
             return b"*0\r\n"
@@ -224,6 +294,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                 if persist:
                     with open("appendonly.aof", "a") as f:
                         f.write("HDEL {} {}\n".format(key, field))
+                if should_replicate:
+                   replicate_command(request)
                 return b":1\r\n"
             else:
                 return b":0\r\n"
@@ -234,6 +306,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         field = request[2]
         if key in database:
             if field in database[key]:
+                if should_replicate:
+                   replicate_command(request)
                 return b":1\r\n"
             else:
                 return b":0\r\n"
@@ -242,6 +316,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
     elif request[0] == "HLEN":
         key = request[1]
         if key in database:
+            if should_replicate:
+               replicate_command(request)
             return f":{len(database[key])}\r\n".encode()
         else:
             return b"*0\r\n"
@@ -254,6 +330,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if persist:
             with open("appendonly.aof", "a") as f:
                 f.write(" ".join(request) + "\n")
+            if should_replicate:
+               replicate_command(request)
             return b":1\r\n"
         return b":0\r\n"
     elif request[0] == "SMEMBERS":
@@ -263,6 +341,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
             response = f"*{len(members)}\r\n"
             for member in members:
                 response += f"${len(member)}\r\n{member}\r\n"
+            if should_replicate:
+               replicate_command(request)
             return response.encode()
         else:
             return b"*0\r\n"
@@ -278,6 +358,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
             if persist:
                 with open("appendonly.aof", "a") as f:
                     f.write(" ".join(request) + "\n")
+            if should_replicate:
+               replicate_command(request)
             return f":{removed}\r\n".encode()
         return b":0\r\n"
     elif request[0] == "SISMEMBER":
@@ -285,6 +367,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         member = request[2]
         if key in database:
             if member in database[key]:
+                if should_replicate:
+                   replicate_command(request)
                 return b":1\r\n"
             else:
                 return b":0\r\n"
@@ -293,6 +377,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
     elif request[0] == "SCARD":
         key = request[1]
         if key in database:
+            if should_replicate:
+               replicate_command(request)
             return f":{len(database[key])}\r\n".encode()
         else:
             return b"*0\r\n"
@@ -304,6 +390,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                 if persist:
                     with open("appendonly.aof", "a") as f:
                         f.write(f"SREM {key} {member}\n")
+                if should_replicate:
+                   replicate_command(request)
                 return f"${len(member)}\r\n{member}\r\n".encode()
             else:
                 return b"$-1\r\n"
@@ -318,6 +406,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         response += "$9\r\nsubscribe\r\n"
         response += f"${len(channel)}\r\n{channel}\r\n"
         response += ":1\r\n"
+        if should_replicate:
+           replicate_command(request)
         return response.encode()
     elif request[0] == "PUBLISH":
         channel = request[1]
@@ -330,6 +420,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
                 response += f"${len(channel)}\r\n{channel}\r\n"
                 response += f"${len(message)}\r\n{message}\r\n"
                 subscriber.sendall(response.encode())
+            if should_replicate:
+               replicate_command(request)
             return f":{len(subscribers)}\r\n".encode()
         else:
             return b":0\r\n"
@@ -344,6 +436,8 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         response += "$11\r\nunsubscribe\r\n"
         response += f"${len(channel)}\r\n{channel}\r\n"
         response += ":0\r\n"
+        if should_replicate:
+           replicate_command(request)
         return response.encode()
     elif request[0] == "MULTI":
         start_transaction(client_connection)
@@ -355,14 +449,24 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
             clear_transaction(client_connection)
             for cmd in commands:
                 execute_command(cmd, client_connection=client_connection, executing=True)
+            if should_replicate:
+               replicate_command(request)
             return b"+OK\r\n"
         return b"-ERROR: NO TRANSACTION\r\n"
 
     elif request[0] == "DISCARD":
         if is_in_transaction(client_connection):
             clear_transaction(client_connection)
+            if should_replicate:
+               replicate_command(request)
             return b"+OK\r\n"
         return b"-ERROR: NO TRANSACTION\r\n"
+    
+    elif request[0] == "REPLICA":
+        replicas.add(client_connection)
+        if should_replicate:
+           replicate_command(request)
+        return b"+OK\r\n"
 
     else:
         return b"-ERROR: Unknown command\r\n"
