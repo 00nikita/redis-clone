@@ -15,6 +15,27 @@ replication_backlog = deque()
 backlog_size = 0
 backlog_start_offset = 1
 
+def get_backlog_data(requested_offset):
+    if not replication_backlog:
+        return None
+
+    # The requested offset must still exist in the backlog
+    if requested_offset < backlog_start_offset - 1:
+        return None
+
+    result = bytearray()
+
+    for command_start_offset, command_bytes in replication_backlog:
+        command_end_offset = (
+            command_start_offset + len(command_bytes) - 1
+        )
+
+        # Include commands that contain bytes after requested_offset
+        if command_end_offset > requested_offset:
+            result.extend(command_bytes)
+
+    return bytes(result)
+
 def add_to_backlog(command_bytes, command_start_offset):
     global backlog_size
     global backlog_start_offset

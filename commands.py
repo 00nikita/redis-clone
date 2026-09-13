@@ -3,7 +3,7 @@ import time
 import json 
 from pubsub import subscriptions
 from transactions import ( start_transaction, queue_command, get_queued_commands, clear_transaction, is_in_transaction )
-from replication import ( replicas, replicate_command, send_snapshot, get_replication_id, get_replication_offset, increase_replication_offset )
+from replication import ( replicas, replicate_command, send_snapshot, get_replication_id, get_replication_offset, increase_replication_offset, get_backlog_data )
 import pickle
 
 with open("config.json") as f:
@@ -457,6 +457,59 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         if should_replicate:
            replicate_command(request)
         return b"+OK\r\n"
+
+    elif request[0] == "PSYNC":
+        requested_replication_id = request[1]
+        requested_offset = int(request[2])
+
+        current_replication_id = get_replication_id()
+        current_replication_offset = get_replication_offset()
+
+        # Case 1: Replica has never synchronized
+        if requested_replication_id == "?" or requested_offset == -1:
+            response = (
+                f"+FULLRESYNC {current_replication_id} "
+                f"{current_replication_offset}\r\n"
+            ).encode()
+
+            client_connection.sendall(response)
+            send_snapshot(client_connection)
+
+            return b""
+
+        # Case 2: Replica has a different replication history
+        if requested_replication_id != current_replication_id:
+            response = (
+                f"+FULLRESYNC {current_replication_id} "
+                f"{current_replication_offset}\r\n"
+            ).encode()
+
+            client_connection.sendall(response)
+            send_snapshot(client_connection)
+
+            return b""
+
+        # Case 3: Try partial synchronization
+        backlog_data = get_backlog_data(requested_offset)
+
+        if backlog_data is None:
+            response = (
+                f"+FULLRESYNC {current_replication_id} "
+                f"{current_replication_offset}\r\n"
+            ).encode()
+
+            client_connection.sendall(response)
+            send_snapshot(client_connection)
+
+            return b""
+
+        # Partial resynchronization is possible
+        client_connection.sendall(b"+CONTINUE\r\n")
+        client_connection.sendall(backlog_data)
+
+        return b""
+
+
 
     else:
         return b"-ERROR: Unknown command\r\n"
