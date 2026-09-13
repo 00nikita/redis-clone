@@ -1,7 +1,13 @@
 import pickle
 import struct
-
+import uuid
 from database import database
+
+
+replication_id = uuid.uuid4().hex
+
+def get_replication_id():
+    return replication_id
 
 def create_snapshot():
     """

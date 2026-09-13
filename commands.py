@@ -3,7 +3,7 @@ import time
 import json 
 from pubsub import subscriptions
 from transactions import ( start_transaction, queue_command, get_queued_commands, clear_transaction, is_in_transaction )
-from replication import replicas
+from replication import ( replicas, replicate_command, send_snapshot, get_replication_id )
 import pickle
 
 with open("config.json") as f:
@@ -465,6 +465,7 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
     
     elif request[0] == "REPLICA":
         replicas.add(client_connection)
+        print(f"New replica connected: {get_replication_id()}")
         if should_replicate:
            replicate_command(request)
         return b"+OK\r\n"
