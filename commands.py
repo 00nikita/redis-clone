@@ -3,7 +3,7 @@ import time
 import json 
 from pubsub import subscriptions
 from transactions import ( start_transaction, queue_command, get_queued_commands, clear_transaction, is_in_transaction )
-from replication import ( replicas, replicate_command, send_snapshot, get_replication_id )
+from replication import ( replicas, replicate_command, send_snapshot, get_replication_id, get_replication_offset, increase_replication_offset )
 import pickle
 
 with open("config.json") as f:
@@ -27,18 +27,6 @@ WRITE_COMMANDS = {
     "ZADD",
     "ZREM",
 }
-
-def replicate_command(request):
-    for replica in list(replicas):
-        try:
-            resp = f"*{len(request)}\r\n"
-            for word in request:
-                resp += f"${len(word)}\r\n{word}\r\n"
-            replica.sendall(resp.encode())
-        except (BrokenPipeError, ConnectionResetError):
-            replicas.remove(replica)
-            replica.close()
-
 
 def execute_command(request, persist=False, client_connection=None, executing=False, from_replica=False):
     should_replicate = (
