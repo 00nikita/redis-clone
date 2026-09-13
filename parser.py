@@ -1,4 +1,5 @@
 from commands import execute_command 
+from replication import send_snapshot
 
 def handle_client(client_connection, buffer):
     request = []
@@ -27,4 +28,7 @@ def handle_client(client_connection, buffer):
     buffer = remaining_part
     response = execute_command(request, persist=True, client_connection=client_connection, executing=False)
     client_connection.sendall(response)
+
+    if request[0] == "REPLICA":
+        send_snapshot(client_connection)
     return buffer

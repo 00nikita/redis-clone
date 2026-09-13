@@ -8,7 +8,6 @@ from aof_parser import load_aof, rewrite_aof, should_rewrite_aof
 import select
 from pubsub import subscriptions
 
-
 with open("config.json") as f:
     config = json.load(f)
 

@@ -4,6 +4,7 @@ import json
 from pubsub import subscriptions
 from transactions import ( start_transaction, queue_command, get_queued_commands, clear_transaction, is_in_transaction )
 from replication import replicas
+import pickle
 
 with open("config.json") as f:
     config = json.load(f)

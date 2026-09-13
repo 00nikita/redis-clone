@@ -2,6 +2,8 @@ import socket
 import time
 from commands import execute_command
 import database
+import pickle
+import struct
 
 PRIMARY_HOST = "127.0.0.1"
 PRIMARY_PORT = 6379
@@ -26,6 +28,42 @@ replica_socket.sendall(handshake.encode())
 
 response = replica_socket.recv(1024)
 print("Primary:", response.decode())
+
+# Read exactly 4 bytes containing the snapshot length.
+snapshot_length_bytes = b""
+
+while len(snapshot_length_bytes) < 4:
+    chunk = replica_socket.recv(4 - len(snapshot_length_bytes))
+
+    if not chunk:
+        raise ConnectionError("Primary disconnected during snapshot header")
+
+    snapshot_length_bytes += chunk
+
+snapshot_length = struct.unpack("!I", snapshot_length_bytes)[0]
+
+print("Snapshot size:", snapshot_length, "bytes")
+
+snapshot_bytes = b""
+
+while len(snapshot_bytes) < snapshot_length:
+    chunk = replica_socket.recv(
+        min(4096, snapshot_length - len(snapshot_bytes))
+    )
+
+    if not chunk:
+        raise ConnectionError("Primary disconnected during snapshot transfer")
+
+    snapshot_bytes += chunk
+
+
+received_database = pickle.loads(snapshot_bytes)
+
+database.clear()
+database
+
+print("Initial database received:")
+print(database)
 
 while True:
     data = replica_socket.recv(4096)
