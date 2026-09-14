@@ -2,9 +2,9 @@ import pickle
 import struct
 import uuid
 from database import database
-from replica import replicas
 from collections import deque
 
+replicas = set()
 
 replication_id = uuid.uuid4().hex
 replication_offset = 0

@@ -459,6 +459,7 @@ def execute_command(request, persist=False, client_connection=None, executing=Fa
         return b"+OK\r\n"
 
     elif request[0] == "PSYNC":
+        replicas.add(client_connection)
         requested_replication_id = request[1]
         requested_offset = int(request[2])
 
