@@ -14,6 +14,14 @@ PRIMARY_PORT = 6379
 # TCP HELPERS
 # --------------------------------------------------
 
+socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+socket.bind(('0.0.0.0', 6380))
+
+socket.listen()
+
+socket = [socket]
+
 def read_line(sock):
     """
     Read bytes until CRLF is received.
