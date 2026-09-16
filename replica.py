@@ -20,7 +20,14 @@ socket.bind(('0.0.0.0', 6380))
 
 socket.listen()
 
-socket = [socket]
+socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+socket.connect(
+    (PRIMARY_HOST, PRIMARY_PORT)
+)
+primary_connection = socket
+
+
+socket = [socket, primary_connection]
 
 def read_line(sock):
     """
