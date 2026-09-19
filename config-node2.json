@@ -1,0 +1,5 @@
+{
+    "port": 6381,
+    "host": "0.0.0.0",
+    "expiry_time_in_seconds": 10
+}

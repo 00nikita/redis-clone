@@ -1,6 +1,7 @@
 import socket
 import json 
 import os
+import sys
 from commands import execute_command
 from parser import handle_client
 from database import database
@@ -8,7 +9,9 @@ from aof_parser import load_aof, rewrite_aof, should_rewrite_aof
 import select
 from pubsub import subscriptions
 
-with open("config.json") as f:
+config_file = sys.argv[1]
+
+with open(config_file) as f:
     config = json.load(f)
 
 #creating socket

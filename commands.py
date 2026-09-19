@@ -6,9 +6,6 @@ from transactions import ( start_transaction, queue_command, get_queued_commands
 from replication import ( replicas, replicate_command, send_snapshot, get_replication_id, get_replication_offset, increase_replication_offset, get_backlog_data )
 import pickle
 
-with open("config.json") as f:
-    config = json.load(f)
-
 WRITE_COMMANDS = {
     "SET",
     "DEL",
