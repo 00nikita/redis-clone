@@ -86,10 +86,10 @@ def replicate_command(request):
             replica.sendall(command_bytes)
         except (BrokenPipeError, ConnectionResetError):
             replicas.discard(replica)
-        try:
-            replica.close()
-        except OSError:
-            pass
+            try:
+                replica.close()
+            except OSError:
+                pass
 
 def get_backlog_info():
     return {
